@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频辨识实验 - 馆长版</title>
+    <title>音频时间包络辨识实验</title>
+    <script src="https://cdn.jsdelivr.net/npm/bmob-js-sdk@2.2.3/dist/Bmob-2.2.3.min.js"></script>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -16,8 +17,6 @@
         input, select { width: 100%; padding: 16px; margin: 12px 0; border: 1px solid #d2d2d7; border-radius: 12px; font-size: 16px; box-sizing: border-box; background: #fbfbfd; }
         .progress { font-size: 13px; color: #86868b; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .feedback { margin-top: 20px; font-size: 18px; font-weight: 600; min-height: 28px; }
-        .backup-area { background: #fff2f2; border: 1px solid #ff3b30; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: left; }
-        textarea { width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-top: 10px; border-radius: 8px; border: 1px solid #d2d2d7; padding: 8px; }
     </style>
 </head>
 <body>
@@ -26,8 +25,8 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p>音频序列已固定打乱（所有人一致）。请佩戴耳机开始。</p>
-        <button onclick="showStep(2)">开始测试</button>
+        <p>音频序列已采用固定打乱（种子 2026）。请戴上耳机开始测试。</p>
+        <button onclick="showStep(2)">开始实验</button>
     </div>
 
     <div id="step-2" class="hidden">
@@ -52,17 +51,15 @@
     <div id="step-end" class="hidden">
         <div style="font-size: 50px; margin-bottom: 20px;">✨</div>
         <h2>测试完成</h2>
-        <p>感谢您的参与！</p>
+        <p>数据已成功存入 Bmob 数据库。感谢参与！</p>
     </div>
 </div>
 
 <script>
-    // --- 核心配置 ---
-    const API_TOKEN = '5fed6fde773e00d5f760cd23d1c8b498e4bdecde'; 
-    const BASE_URL = "https://cloud.seatable.cn";
-    const audioPath = "audio/"; 
+    // --- Bmob 初始化 ---
+    Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
 
-    // --- 实验题目 ---
+    const audioPath = "audio/"; 
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
         { id: "testring_Forward", options: ["玻璃破碎声", "电话声", "直升机声", "发条声", "引擎声"], answer: "电话声" },
@@ -94,7 +91,7 @@
 
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
 
-    // --- 固定顺序打乱（种子 2026） ---
+    // --- 所有人一致的乱序逻辑（种子 2026） ---
     function seededShuffle(array, seed) {
         let m = array.length, t, i;
         while (m) {
@@ -170,7 +167,7 @@
         } else {
             state.results.push({ id: t.id, choice: opt, correct: ok });
             if(++state.index < state.tasks.length) loadTask();
-            else submitAll();
+            else submitToBmob();
         }
     }
 
@@ -181,65 +178,23 @@
         loadTask();
     }
 
-    async function submitAll() {
-        const loadingDiv = document.getElementById('step-test');
-        loadingDiv.innerHTML = "<h3>正在同步数据...</h3>";
-        
-        const uName = document.getElementById('username').value || "匿名";
-        const uAge = document.getElementById('age').value;
-        const backupData = `姓名:${uName} | 年龄:${uAge} | 结果:${JSON.stringify(state.results)}`;
+    async function submitToBmob() {
+        document.getElementById('step-test').innerHTML = "<h3>正在同步实验结果...</h3>";
+        try {
+            // 在 Bmob 中动态创建 ExperimentResult 表并存储数据
+            const query = Bmob.Query("ExperimentResult");
+            query.set("username", document.getElementById('username').value || "匿名");
+            query.set("age", parseInt(document.getElementById('age').value));
+            query.set("gender", document.getElementById('gender').value);
+            query.set("ability", document.getElementById('ability').value);
+            query.set("results_json", JSON.stringify(state.results));
 
-        // 尝试直连路径
-        const paths = [
-            `${BASE_URL}/api/v2/dtable-access-token/`,
-            `${BASE_URL}/api/v2/dtables/access-token/`
-        ];
-
-        for (let url of paths) {
-            try {
-                // --- 直连请求 ---
-                const res = await fetch(url, {
-                    headers: { 'Authorization': 'Token ' + API_TOKEN }
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    const writeRes = await fetch(`${BASE_URL}/dtable-server/api/v1/dtables/${data.dtable_uuid}/rows/`, {
-                        method: 'POST',
-                        headers: { 
-                            'Authorization': 'Token ' + data.access_token, 
-                            'Content-Type': 'application/json' 
-                        },
-                        body: JSON.stringify({
-                            table_name: 'Table1',
-                            row: {
-                                "名称": uName, "username": uName, "age": parseInt(uAge),
-                                "gender": document.getElementById('gender').value,
-                                "ability": document.getElementById('ability').value,
-                                "full_results": JSON.stringify(state.results)
-                            }
-                        })
-                    });
-                    
-                    if (writeRes.ok) {
-                        showStep('end');
-                        return;
-                    }
-                }
-            } catch (e) { 
-                console.error("直连尝试失败（可能是由于 CORS 策略）:", url); 
-            }
+            await query.save();
+            showStep('end');
+        } catch (e) {
+            console.error("Bmob 上传失败:", e);
+            alert("上传失败，请截图控制台报错信息。");
         }
-
-        // 只要出现报错（直连不通），自动弹出备份区域
-        loadingDiv.innerHTML = `
-            <div class="backup-area">
-                <p style="color:#ff3b30; font-weight:bold;">⚠️ 自动上传受限</p>
-                <p style="font-size:12px;">由于安全策略，数据未能自动上传。请复制下方内容发送给馆长：</p>
-                <textarea readonly onclick="this.select()">${backupData}</textarea>
-                <button onclick="showStep('end')">已复制并结束</button>
-            </div>
-        `;
     }
 </script>
 </body>
