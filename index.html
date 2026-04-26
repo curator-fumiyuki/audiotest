@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频时间包络辨识实验</title>
+    <style>
+        :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        #app { width: 95%; max-width: 500px; background: var(--card); padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; }
+        .hidden { display: none; }
+        button { background: var(--primary); color: white; border: none; padding: 14px 28px; border-radius: 12px; font-size: 16px; cursor: pointer; transition: 0.3s; margin: 10px 0; width: 100%; }
+        button:disabled { background: #d2d2d7; cursor: not-allowed; }
+        .option-btn { background: #f2f2f7; color: #1d1d1f; border: 1px solid #d2d2d7; margin: 8px 0; text-align: left; padding: 16px; font-weight: 500; }
+        .option-btn:hover { background: #e5e5ea; }
+        .icon { font-size: 60px; margin-bottom: 24px; }
+        .progress { font-size: 14px; color: #86868b; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        .feedback { margin-top: 20px; font-size: 18px; font-weight: bold; min-height: 24px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="step-1">
+        <div class="icon">🎧</div>
+        <h2>辨认声音测试</h2>
+        <p>大约 3-5 分钟即可完成。</p>
+        <p style="font-size: 14px; color: #86868b;">本实验不会搜集任何个人隐私信息。</p>
+        <button onclick="showStep(2)">开始实验</button>
+    </div>
+
+    <div id="step-2" class="hidden">
+        <h2>背景信息</h2>
+        <input type="text" id="username" placeholder="您的称呼（可选）">
+        <input type="number" id="age" placeholder="您的年龄">
+        <select id="gender">
+            <option value="">请选择性别</option>
+            <option value="男">男</option>
+            <option value="女">女</option>
+        </select>
+        <select id="ability">
+            <option value="">自评声音识别能力</option>
+            <option value="非常强">非常强</option>
+            <option value="较强">较强</option>
+            <option value="一般">一般</option>
+            <option value="较弱">较弱</option>
+            <option value="非常弱">非常弱</option>
+        </select>
+        <button onclick="checkInfo()">进入热身阶段</button>
+    </div>
+
+    <div id="step-test" class="hidden">
+        <div id="progress-text" class="progress"></div>
+        <div class="icon">🔊</div>
+        <p id="play-count-text">剩余播放次数：2</p>
+        <button id="play-btn" onclick="handlePlay()">点击播放声音</button>
+        
+        <div id="options-container" class="hidden">
+            <p style="color: #86868b;">请选择最接近的答案：</p>
+            <div id="options-list"></div>
+        </div>
+        <div id="test-feedback" class="feedback"></div>
+    </div>
+
+    <div id="step-end" class="hidden">
+        <div class="icon">✨</div>
+        <h2>实验已完成</h2>
+        <p>您的数据已上传，感谢您的参与！</p>
+    </div>
+</div>
+
+<script>
+    // --- SeaTable 自动配置 ---
+    const API_TOKEN = 'bdf2dc596b026d91ee9e16ea979946ff3af2fb2f'; 
+    const BASE_URL = 'https://cloud.seatable.cn';
+    const audioPath = "audio/"; // 请确保音频放在 audio/ 文件夹下
+
+    // --- 练习题数据 [cite: 11-13] ---
+    const practiceTasks = [
+        { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
+        { id: "testring_Forward", options: ["玻璃破碎声", "电话声", "直升机声", "发条声", "引擎声"], answer: "电话声" },
+        { id: "testtrain_Reversed", options: ["象鸣声", "闹铃声", "火车声", "警报声", "拖椅子声"], answer: "火车声" }
+    ];
+
+    // --- 正式题数据  ---
+    const formalTasks = [
+        { id: "bell_Forward", options: ["闹铃声", "发条声", "敲击铁盆声", "玩具声", "鸡叫声"], answer: "闹铃声" },
+        { id: "bell_Reversed", options: ["发条声", "鸡叫声", "闹铃声", "收银机声", "钱币碰撞声"], answer: "闹铃声" },
+        { id: "duck_Forward", options: ["木板嘎吱声", "木椅子声", "钻木声", "橡皮鸭声", "鸭叫声"], answer: "鸭叫声" },
+        { id: "duck_Reversed", options: ["钻木声", "木板嘎吱声", "鸭叫声", "橡皮鸭声", "锯木声"], answer: "鸭叫声" },
+        { id: "engine_Forward", options: ["强风声", "打鼾声", "引擎声", "象鸣声", "伐木声"], answer: "引擎声" },
+        { id: "engine_Reversed", options: ["打鼾声", "象鸣声", "强风声", "引擎声", "轮机声"], answer: "引擎声" },
+        { id: "keyboard_Forward", options: ["键盘声", "小跑声", "拍面团声", "剁肉声", "咂嘴声"], answer: "键盘声" },
+        { id: "keyboard_Reversed", options: ["直升机声", "剁肉声", "键盘声", "敲黑板声", "小跑声"], answer: "键盘声" },
+        { id: "knock_Forward", options: ["敲门声", "弹珠声", "高跟鞋声", "积木声", "保龄球声"], answer: "敲门声" },
+        { id: "knock_Reversed", options: ["直升机声", "强风声", "弹珠声", "啄木鸟声", "敲门声"], answer: "敲门声" },
+        { id: "leaves_Forward", options: ["流沙声", "风吹树叶声", "海浪声", "雷雨声", "车行驶声"], answer: "风吹树叶声" },
+        { id: "leaves_Reversed", options: ["车行驶声", "流沙声", "海浪声", "风吹树叶声", "雷雨声"], answer: "风吹树叶声" },
+        { id: "rain_Forward", options: ["暴雨声", "流沙声", "淋浴声", "挤压塑料声", "拖拽纸箱声"], answer: "暴雨声" },
+        { id: "rain_Reversed", options: ["抽水声", "淋雨声", "挤压塑料声", "暴雨声", "拖拽纸箱声"], answer: "暴雨声" },
+        { id: "testcrushedbottle_Forward", options: ["油沸腾声", "挤压塑料声", "木板嘎吱声", "放屁声", "弹珠声"], answer: "挤压塑料声" },
+        { id: "testcrushedbottle_Reversed", options: ["拉链声", "木板嘎吱声", "放屁声", "油沸腾声", "抽水声"], answer: "抽水声" },
+        { id: "walk_Forward", options: ["走楼梯声", "射击声", "钻地声", "鞭炮声", "弹珠声"], answer: "走楼梯声" },
+        { id: "walk_Reversed", options: ["史莱姆声", "吮吸声", "钻地声", "走楼梯声", "射击声"], answer: "走楼梯声" },
+        { id: "wave_Forward", options: ["强风声", "海浪声", "流沙声", "风吹树叶声", "雷声"], answer: "海浪声" },
+        { id: "wave_Reversed", options: ["车行驶声", "强风声", "风吹树叶声", "海浪声", "流沙声"], answer: "海浪声" }
+    ];
+
+    let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
+
+    function showStep(s) {
+        document.querySelectorAll('#app > div').forEach(d => d.classList.add('hidden'));
+        document.getElementById(s === 'test' ? 'step-test' : `step-${s}`).classList.remove('hidden');
+    }
+
+    function checkInfo() {
+        if(!document.getElementById('age').value || !document.getElementById('ability').value) return alert("请先填写个人自评信息");
+        state.tasks = practiceTasks;
+        showStep('test');
+        loadTask();
+    }
+
+    function loadTask() {
+        const t = state.tasks[state.index];
+        document.getElementById('progress-text').innerText = `${state.isPractice ? '热身题' : '正式题'} ${state.index + 1}/${state.tasks.length}`;
+        document.getElementById('options-container').classList.add('hidden');
+        document.getElementById('test-feedback').innerText = "";
+        state.plays = 0;
+        updateUI();
+        state.audio.src = `${audioPath}${t.id}.wav`;
+        state.audio.load();
+    }
+
+    function updateUI() {
+        document.getElementById('play-count-text').innerText = `剩余播放次数：${2 - state.plays}`;
+        document.getElementById('play-btn').disabled = state.plays >= 2;
+    }
+
+    function handlePlay() {
+        if(state.plays < 2) {
+            state.audio.play();
+            state.plays++;
+            updateUI();
+            state.audio.onended = () => {
+                document.getElementById('options-container').classList.remove('hidden');
+                renderOptions();
+            };
+        }
+    }
+
+    function renderOptions() {
+        const list = document.getElementById('options-list');
+        list.innerHTML = "";
+        state.tasks[state.index].options.forEach(opt => {
+            const b = document.createElement('button');
+            b.className = "option-btn";
+            b.innerText = opt;
+            b.onclick = () => selectOption(opt);
+            list.appendChild(b);
+        });
+    }
+
+    function selectOption(opt) {
+        const t = state.tasks[state.index];
+        const ok = opt === t.answer;
+        
+        if(state.isPractice) {
+            document.getElementById('test-feedback').innerText = ok ? "✅ 回答正确！请继续。" : `❌ 错误。那是${t.answer}。`; [cite: 14]
+            document.getElementById('test-feedback').style.color = ok ? "#34c759" : "#ff3b30";
+            setTimeout(() => {
+                if(++state.index < state.tasks.length) loadTask();
+                else startFormal();
+            }, 1800);
+        } else {
+            state.results.push({ id: t.id, choice: opt, correct: ok });
+            if(++state.index < state.tasks.length) loadTask();
+            else submitAll();
+        }
+    }
+
+    function startFormal() {
+        alert("热身结束。现在进入 20 题正式测试，将不再提供反馈提示。"); [cite: 16]
+        state.isPractice = false;
+        state.index = 0;
+        state.tasks = formalTasks.sort(() => Math.random() - 0.5); // 随机打乱 [cite: 16]
+        loadTask();
+    }
+
+    async function submitAll() {
+        document.getElementById('step-test').innerHTML = "<h3>正在上传数据，请稍候...</h3>";
+        try {
+            const authRes = await fetch(`${BASE_URL}/api/v2/dt-api/tasks/get-dtable-access-token/`, {
+                headers: { 'Authorization': `Token ${API_TOKEN}` }
+            });
+            const { access_token, dtable_uuid } = await authRes.json();
+            await fetch(`${BASE_URL}/dtable-server/api/v1/dtables/${dtable_uuid}/rows/`, {
+                method: 'POST',
+                headers: { 'Authorization': `Token ${access_token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    table_name: 'Table1',
+                    row: {
+                        username: document.getElementById('username').value,
+                        age: parseInt(document.getElementById('age').value),
+                        gender: document.getElementById('gender').value,
+                        ability: document.getElementById('ability').value,
+                        full_results: JSON.stringify(state.results)
+                    }
+                })
+            });
+            showStep('end');
+        } catch (e) { alert("上传失败，请截图结果并联系馆长。"); }
+    }
+</script>
+</body>
+</html>
