@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频时间包络辨识实验</title>
-    <script src="https://cdn.jsdelivr.net/npm/bmob-js-sdk@2.2.3/dist/Bmob-2.2.3.min.js"></script>
+    <title>音频辨识实验</title>
+    <script src="https://unpkg.com/hydrogen-js-sdk@2.2.3/dist/Bmob-2.2.3.min.js"></script>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -17,6 +17,8 @@
         input, select { width: 100%; padding: 16px; margin: 12px 0; border: 1px solid #d2d2d7; border-radius: 12px; font-size: 16px; box-sizing: border-box; background: #fbfbfd; }
         .progress { font-size: 13px; color: #86868b; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .feedback { margin-top: 20px; font-size: 18px; font-weight: 600; min-height: 28px; }
+        .backup-area { background: #fff2f2; border: 1px solid #ff3b30; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: left; }
+        textarea { width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-top: 10px; border-radius: 8px; border: 1px solid #d2d2d7; padding: 8px; }
     </style>
 </head>
 <body>
@@ -25,7 +27,7 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p>数据系统已就绪（Bmob 强力驱动）。请戴上耳机开始测试。</p>
+        <p id="system-status">音频序列已采用固定打乱（种子 2026）。请戴上耳机开始测试。</p>
         <button onclick="showStep(2)">开始实验</button>
     </div>
 
@@ -49,12 +51,12 @@
     <div id="step-end" class="hidden">
         <div style="font-size: 50px; margin-bottom: 20px;">✨</div>
         <h2>实验完成</h2>
-        <p>数据已成功存入后端。感谢您的参与！</p>
+        <p>数据已妥善处理。感谢您的参与！</p>
     </div>
 </div>
 
 <script>
-    // --- 2. 变量提升：将所有全局变量和状态提到最顶端，解决 Initialization 错误 ---
+    // 变量提升机制
     const audioPath = "audio/";
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
@@ -85,15 +87,18 @@
     ];
 
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
+    let isBmobReady = false;
 
-    // --- 3. Bmob 初始化保护 ---
-    try {
-        Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
-    } catch (e) {
-        console.error("Bmob 加载失败，请检查网络连接");
-    }
+    // --- 安全的 Bmob 初始化 ---
+    window.onload = function() {
+        if (typeof Bmob !== 'undefined') {
+            Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
+            isBmobReady = true;
+        } else {
+            console.warn("网络原因导致 Bmob SDK 未能加载，将启用本地备份模式。");
+        }
+    };
 
-    // --- 4. 辅助函数 ---
     function seededShuffle(array, seed) {
         let m = array.length, t, i;
         while (m) {
@@ -111,8 +116,7 @@
     }
 
     function checkInfo() {
-        const ageField = document.getElementById('age');
-        if(!ageField.value) return alert("请填写年龄");
+        if(!document.getElementById('age').value) return alert("请填写年龄");
         state.tasks = practiceTasks;
         showStep('test');
         loadTask();
@@ -120,8 +124,7 @@
 
     function loadTask() {
         const t = state.tasks[state.index];
-        const progress = document.getElementById('progress-text');
-        progress.innerText = (state.isPractice ? '热身阶段 ' : '正式测试 ') + (state.index + 1) + ' / ' + state.tasks.length;
+        document.getElementById('progress-text').innerText = (state.isPractice ? '热身 ' : '正式 ') + (state.index + 1) + ' / ' + state.tasks.length;
         document.getElementById('options-container').classList.add('hidden');
         document.getElementById('test-feedback').innerText = "";
         state.plays = 0;
@@ -137,7 +140,7 @@
 
     function handlePlay() {
         if(state.plays < 2) {
-            state.audio.play();
+            state.audio.play().catch(e => console.log("等待用户交互"));
             state.plays++;
             updateUI();
             state.audio.onended = () => {
@@ -172,7 +175,7 @@
         } else {
             state.results.push({ id: t.id, choice: opt, correct: ok });
             if(++state.index < state.tasks.length) loadTask();
-            else submitToBmob();
+            else submitData();
         }
     }
 
@@ -183,23 +186,41 @@
         loadTask();
     }
 
-    async function submitToBmob() {
+    async function submitData() {
         const loadingDiv = document.getElementById('step-test');
-        loadingDiv.innerHTML = "<h3>正在同步数据...</h3>";
-        try {
-            const query = Bmob.Query("ExperimentResult");
-            query.set("username", document.getElementById('username').value || "匿名");
-            query.set("age", parseInt(document.getElementById('age').value));
-            query.set("gender", document.getElementById('gender').value);
-            query.set("ability", document.getElementById('ability').value);
-            query.set("results_json", JSON.stringify(state.results));
+        loadingDiv.innerHTML = "<h3>正在处理结果...</h3>";
+        
+        const uName = document.getElementById('username').value || "匿名";
+        const uAge = document.getElementById('age').value;
+        const backupData = `姓名:${uName} | 年龄:${uAge} | 结果:${JSON.stringify(state.results)}`;
 
-            await query.save();
-            showStep('end');
-        } catch (e) {
-            console.error("提交失败:", e);
-            alert("上传失败，请确保网络正常或截图告知馆长。");
+        // 如果 Bmob 成功加载，走云端上传
+        if (isBmobReady) {
+            try {
+                const query = Bmob.Query("ExperimentResult");
+                query.set("username", uName);
+                query.set("age", parseInt(uAge));
+                query.set("gender", document.getElementById('gender').value);
+                query.set("ability", document.getElementById('ability').value);
+                query.set("results_json", JSON.stringify(state.results));
+
+                await query.save();
+                showStep('end');
+                return;
+            } catch (e) {
+                console.error("云端写入失败", e);
+            }
         }
+
+        // 如果 Bmob 没加载出来，或者上传失败，走本地降级备份（保证受试者心血不浪费）
+        loadingDiv.innerHTML = `
+            <div class="backup-area">
+                <p style="color:#ff3b30; font-weight:bold;">⚠️ 当前网络限制了自动上传</p>
+                <p style="font-size:12px;">为确保您的测试有效，请点击下方文本框全选复制，并通过微信发送给馆长：</p>
+                <textarea readonly onclick="this.select()">${backupData}</textarea>
+                <button onclick="showStep('end')" style="background:#34c759; margin-top:10px;">我已复制并发送</button>
+            </div>
+        `;
     }
 </script>
 </body>
