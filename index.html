@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>音频辨识实验</title>
-    <script src="https://unpkg.com/hydrogen-js-sdk@2.2.3/dist/Bmob-2.2.3.min.js"></script>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        #app { width: 90%; max-width: 460px; background: var(--card); padding: 40px; border-radius: 28px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); text-align: center; }
+        #app { width: 95%; max-width: 460px; background: var(--card); padding: 40px; border-radius: 28px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); text-align: center; }
         .hidden { display: none; }
         button { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 500; cursor: pointer; transition: 0.2s; margin: 10px 0; width: 100%; }
         button:hover { opacity: 0.9; transform: scale(0.98); }
@@ -18,7 +17,7 @@
         .progress { font-size: 13px; color: #86868b; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .feedback { margin-top: 20px; font-size: 18px; font-weight: 600; min-height: 28px; }
         .backup-area { background: #fff2f2; border: 1px solid #ff3b30; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: left; }
-        textarea { width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-top: 10px; border-radius: 8px; border: 1px solid #d2d2d7; padding: 8px; }
+        textarea { width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-top: 10px; border: 1px solid #d2d2d7; padding: 8px; width: 100%; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -27,7 +26,7 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p id="system-status">音频序列已采用固定打乱（种子 2026）。请戴上耳机开始测试。</p>
+        <p>音频序列已固定打乱。请戴上耳机开始测试。</p>
         <button onclick="showStep(2)">开始实验</button>
     </div>
 
@@ -42,7 +41,7 @@
 
     <div id="step-test" class="hidden">
         <div id="progress-text" class="progress"></div>
-        <p id="play-count-text">剩余播放次数：2</p>
+        <p id="play-count-text">剩余播放：2次</p>
         <button id="play-btn" onclick="handlePlay()">播放声音</button>
         <div id="options-container" class="hidden"><div id="options-list"></div></div>
         <div id="test-feedback" class="feedback"></div>
@@ -51,12 +50,15 @@
     <div id="step-end" class="hidden">
         <div style="font-size: 50px; margin-bottom: 20px;">✨</div>
         <h2>实验完成</h2>
-        <p>数据已妥善处理。感谢您的参与！</p>
+        <p>数据已同步，感谢参与！</p>
     </div>
 </div>
 
 <script>
-    // 变量提升机制
+    // --- 硬件凭证（使用 REST API 模式，不依赖任何库） ---
+    const BMOB_APP_ID = "1f4786ed80f3f863ce99617f4c1a9232";
+    const BMOB_REST_KEY = "a752573cbe0eda46768f8cfb71a44cef";
+
     const audioPath = "audio/";
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
@@ -87,17 +89,6 @@
     ];
 
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
-    let isBmobReady = false;
-
-    // --- 安全的 Bmob 初始化 ---
-    window.onload = function() {
-        if (typeof Bmob !== 'undefined') {
-            Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
-            isBmobReady = true;
-        } else {
-            console.warn("网络原因导致 Bmob SDK 未能加载，将启用本地备份模式。");
-        }
-    };
 
     function seededShuffle(array, seed) {
         let m = array.length, t, i;
@@ -124,7 +115,7 @@
 
     function loadTask() {
         const t = state.tasks[state.index];
-        document.getElementById('progress-text').innerText = (state.isPractice ? '热身 ' : '正式 ') + (state.index + 1) + ' / ' + state.tasks.length;
+        document.getElementById('progress-text').innerText = (state.isPractice ? '热身题 ' : '正式题 ') + (state.index + 1) + ' / ' + state.tasks.length;
         document.getElementById('options-container').classList.add('hidden');
         document.getElementById('test-feedback').innerText = "";
         state.plays = 0;
@@ -140,7 +131,7 @@
 
     function handlePlay() {
         if(state.plays < 2) {
-            state.audio.play().catch(e => console.log("等待用户交互"));
+            state.audio.play();
             state.plays++;
             updateUI();
             state.audio.onended = () => {
@@ -170,7 +161,12 @@
             fb.innerText = ok ? "✅ 正确" : "❌ 错误";
             setTimeout(() => {
                 if(++state.index < state.tasks.length) loadTask();
-                else startFormal();
+                else {
+                    state.isPractice = false;
+                    state.index = 0;
+                    state.tasks = seededShuffle([...formalTasks], 2026);
+                    loadTask();
+                }
             }, 1000);
         } else {
             state.results.push({ id: t.id, choice: opt, correct: ok });
@@ -179,48 +175,47 @@
         }
     }
 
-    function startFormal() {
-        state.isPractice = false;
-        state.index = 0;
-        state.tasks = seededShuffle([...formalTasks], 2026); 
-        loadTask();
-    }
-
     async function submitData() {
         const loadingDiv = document.getElementById('step-test');
-        loadingDiv.innerHTML = "<h3>正在处理结果...</h3>";
+        loadingDiv.innerHTML = "<h3>正在同步实验结果...</h3>";
         
-        const uName = document.getElementById('username').value || "匿名";
-        const uAge = document.getElementById('age').value;
-        const backupData = `姓名:${uName} | 年龄:${uAge} | 结果:${JSON.stringify(state.results)}`;
+        const payload = {
+            username: document.getElementById('username').value || "匿名",
+            age: parseInt(document.getElementById('age').value),
+            gender: document.getElementById('gender').value,
+            ability: document.getElementById('ability').value,
+            results_json: JSON.stringify(state.results)
+        };
 
-        // 如果 Bmob 成功加载，走云端上传
-        if (isBmobReady) {
-            try {
-                const query = Bmob.Query("ExperimentResult");
-                query.set("username", uName);
-                query.set("age", parseInt(uAge));
-                query.set("gender", document.getElementById('gender').value);
-                query.set("ability", document.getElementById('ability').value);
-                query.set("results_json", JSON.stringify(state.results));
+        const backupText = `姓名:${payload.username} | 年龄:${payload.age} | 结果:${payload.results_json}`;
 
-                await query.save();
+        try {
+            // 直接调用 Bmob REST API，不使用任何外部库
+            const response = await fetch("https://api2.bmob.cn/1/classes/ExperimentResult", {
+                method: "POST",
+                headers: {
+                    "X-Bmob-Application-Id": BMOB_APP_ID,
+                    "X-Bmob-REST-API-Key": BMOB_REST_KEY,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
                 showStep('end');
-                return;
-            } catch (e) {
-                console.error("云端写入失败", e);
+            } else {
+                throw new Error("API报错");
             }
+        } catch (e) {
+            loadingDiv.innerHTML = `
+                <div class="backup-area">
+                    <p style="color:#ff3b30; font-weight:bold;">⚠️ 自动上传失败（网络安全限制）</p>
+                    <p style="font-size:12px;">请点击下方文本框，全选并复制结果发送给馆长：</p>
+                    <textarea readonly onclick="this.select()">${backupText}</textarea>
+                    <button onclick="showStep('end')" style="margin-top:10px; background:#34c759;">我已复制并发送</button>
+                </div>
+            `;
         }
-
-        // 如果 Bmob 没加载出来，或者上传失败，走本地降级备份（保证受试者心血不浪费）
-        loadingDiv.innerHTML = `
-            <div class="backup-area">
-                <p style="color:#ff3b30; font-weight:bold;">⚠️ 当前网络限制了自动上传</p>
-                <p style="font-size:12px;">为确保您的测试有效，请点击下方文本框全选复制，并通过微信发送给馆长：</p>
-                <textarea readonly onclick="this.select()">${backupData}</textarea>
-                <button onclick="showStep('end')" style="background:#34c759; margin-top:10px;">我已复制并发送</button>
-            </div>
-        `;
     }
 </script>
 </body>
