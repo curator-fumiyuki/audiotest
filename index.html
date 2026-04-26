@@ -7,12 +7,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bmob-js-sdk@2.2.3/dist/Bmob-2.2.3.min.js"></script>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         #app { width: 90%; max-width: 460px; background: var(--card); padding: 40px; border-radius: 28px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); text-align: center; }
         .hidden { display: none; }
-        button { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin: 10px 0; width: 100%; }
+        button { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 500; cursor: pointer; transition: 0.2s; margin: 10px 0; width: 100%; }
         button:hover { opacity: 0.9; transform: scale(0.98); }
-        button:disabled { background: #d2d2d7; cursor: not-allowed; transform: none; }
+        button:disabled { background: #d2d2d7; cursor: not-allowed; }
         .option-btn { background: #f5f5f7; color: var(--text); border: 1px solid #d2d2d7; text-align: left; padding: 16px; margin: 8px 0; }
         input, select { width: 100%; padding: 16px; margin: 12px 0; border: 1px solid #d2d2d7; border-radius: 12px; font-size: 16px; box-sizing: border-box; background: #fbfbfd; }
         .progress { font-size: 13px; color: #86868b; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
@@ -25,7 +25,7 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p>音频序列已采用固定打乱（种子 2026）。请戴上耳机开始测试。</p>
+        <p>数据系统已就绪（Bmob 强力驱动）。请戴上耳机开始测试。</p>
         <button onclick="showStep(2)">开始实验</button>
     </div>
 
@@ -42,30 +42,25 @@
         <div id="progress-text" class="progress"></div>
         <p id="play-count-text">剩余播放次数：2</p>
         <button id="play-btn" onclick="handlePlay()">播放声音</button>
-        <div id="options-container" class="hidden">
-            <div id="options-list"></div>
-        </div>
+        <div id="options-container" class="hidden"><div id="options-list"></div></div>
         <div id="test-feedback" class="feedback"></div>
     </div>
 
     <div id="step-end" class="hidden">
         <div style="font-size: 50px; margin-bottom: 20px;">✨</div>
-        <h2>测试完成</h2>
-        <p>数据已成功存入 Bmob 数据库。感谢参与！</p>
+        <h2>实验完成</h2>
+        <p>数据已成功存入后端。感谢您的参与！</p>
     </div>
 </div>
 
 <script>
-    // --- Bmob 初始化 ---
-    Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
-
-    const audioPath = "audio/"; 
+    // --- 2. 变量提升：将所有全局变量和状态提到最顶端，解决 Initialization 错误 ---
+    const audioPath = "audio/";
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
         { id: "testring_Forward", options: ["玻璃破碎声", "电话声", "直升机声", "发条声", "引擎声"], answer: "电话声" },
         { id: "testtrain_Reversed", options: ["象鸣声", "闹铃声", "火车声", "警报声", "拖椅子声"], answer: "火车声" }
     ];
-
     const formalTasks = [
         { id: "bell_Forward", options: ["闹铃声", "发条声", "敲击铁盆声", "玩具声", "鸡叫声"], answer: "闹铃声" },
         { id: "bell_Reversed", options: ["发条声", "鸡叫声", "闹铃声", "收银机声", "钱币碰撞声"], answer: "闹铃声" },
@@ -91,7 +86,14 @@
 
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
 
-    // --- 所有人一致的乱序逻辑（种子 2026） ---
+    // --- 3. Bmob 初始化保护 ---
+    try {
+        Bmob.initialize("3c00e0a2aeff0cdb", "a752573cbe0eda46768f8cfb71a44cef");
+    } catch (e) {
+        console.error("Bmob 加载失败，请检查网络连接");
+    }
+
+    // --- 4. 辅助函数 ---
     function seededShuffle(array, seed) {
         let m = array.length, t, i;
         while (m) {
@@ -104,11 +106,13 @@
 
     function showStep(s) {
         document.querySelectorAll('#app > div').forEach(d => d.classList.add('hidden'));
-        document.getElementById(s === 'test' ? 'step-test' : 'step-' + s).classList.remove('hidden');
+        const target = document.getElementById(s === 'test' ? 'step-test' : 'step-' + s);
+        if(target) target.classList.remove('hidden');
     }
 
     function checkInfo() {
-        if(!document.getElementById('age').value) return alert("请填写年龄");
+        const ageField = document.getElementById('age');
+        if(!ageField.value) return alert("请填写年龄");
         state.tasks = practiceTasks;
         showStep('test');
         loadTask();
@@ -116,7 +120,8 @@
 
     function loadTask() {
         const t = state.tasks[state.index];
-        document.getElementById('progress-text').innerText = (state.isPractice ? '热身阶段 ' : '正式测试 ') + (state.index + 1) + ' / ' + state.tasks.length;
+        const progress = document.getElementById('progress-text');
+        progress.innerText = (state.isPractice ? '热身阶段 ' : '正式测试 ') + (state.index + 1) + ' / ' + state.tasks.length;
         document.getElementById('options-container').classList.add('hidden');
         document.getElementById('test-feedback').innerText = "";
         state.plays = 0;
@@ -179,9 +184,9 @@
     }
 
     async function submitToBmob() {
-        document.getElementById('step-test').innerHTML = "<h3>正在同步实验结果...</h3>";
+        const loadingDiv = document.getElementById('step-test');
+        loadingDiv.innerHTML = "<h3>正在同步数据...</h3>";
         try {
-            // 在 Bmob 中动态创建 ExperimentResult 表并存储数据
             const query = Bmob.Query("ExperimentResult");
             query.set("username", document.getElementById('username').value || "匿名");
             query.set("age", parseInt(document.getElementById('age').value));
@@ -192,8 +197,8 @@
             await query.save();
             showStep('end');
         } catch (e) {
-            console.error("Bmob 上传失败:", e);
-            alert("上传失败，请截图控制台报错信息。");
+            console.error("提交失败:", e);
+            alert("上传失败，请确保网络正常或截图告知馆长。");
         }
     }
 </script>
