@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频时间包络辨识实验</title>
+    <title>音频辨识实验</title>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -25,14 +25,14 @@
     <div id="step-1">
         <div class="icon">🎧</div>
         <h2>辨认声音测试</h2>
-        <p>大约 3-5 分钟即可完成。</p>
-        <p style="font-size: 14px; color: #86868b;">本实验不会搜集任何个人隐私信息。</p>
+        <p>大约 3-5 分钟即可完成 [cite: 5]。</p>
+        <p style="font-size: 14px; color: #86868b;">本实验不会搜集个人隐私信息 [cite: 5]。</p>
         <button onclick="showStep(2)">开始实验</button>
     </div>
 
     <div id="step-2" class="hidden">
         <h2>背景信息</h2>
-        <input type="text" id="username" placeholder="您的称呼（可选）">
+        <input type="text" id="username" placeholder="您的称呼">
         <input type="number" id="age" placeholder="您的年龄">
         <select id="gender">
             <option value="">请选择性别</option>
@@ -40,7 +40,7 @@
             <option value="女">女</option>
         </select>
         <select id="ability">
-            <option value="">自评声音识别能力</option>
+            <option value="">自评声音识别能力 [cite: 7]</option>
             <option value="非常强">非常强</option>
             <option value="较强">较强</option>
             <option value="一般">一般</option>
@@ -53,11 +53,11 @@
     <div id="step-test" class="hidden">
         <div id="progress-text" class="progress"></div>
         <div class="icon">🔊</div>
-        <p id="play-count-text">剩余播放次数：2</p>
+        <p id="play-count-text">剩余播放次数：2 [cite: 8]</p>
         <button id="play-btn" onclick="handlePlay()">点击播放声音</button>
         
         <div id="options-container" class="hidden">
-            <p style="color: #86868b;">请选择最接近的答案：</p>
+            <p style="color: #86868b;">请选择最接近的答案 [cite: 11]：</p>
             <div id="options-list"></div>
         </div>
         <div id="test-feedback" class="feedback"></div>
@@ -66,24 +66,23 @@
     <div id="step-end" class="hidden">
         <div class="icon">✨</div>
         <h2>实验已完成</h2>
-        <p>您的数据已上传，感谢您的参与！</p>
+        <p>您的数据已上传，感谢您的参与！ [cite: 37]</p>
     </div>
 </div>
 
 <script>
-    // --- SeaTable 自动配置 ---
+    // --- 配置信息 ---
     const API_TOKEN = 'bdf2dc596b026d91ee9e16ea979946ff3af2fb2f'; 
     const BASE_URL = 'https://cloud.seatable.cn';
-    const audioPath = "audio/"; // 请确保音频放在 audio/ 文件夹下
+    const audioPath = "audio/"; // 确保你的文件夹叫 audio
 
-    // --- 练习题数据 [cite: 11-13] ---
+    // --- 题目库 ---
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
         { id: "testring_Forward", options: ["玻璃破碎声", "电话声", "直升机声", "发条声", "引擎声"], answer: "电话声" },
         { id: "testtrain_Reversed", options: ["象鸣声", "闹铃声", "火车声", "警报声", "拖椅子声"], answer: "火车声" }
     ];
 
-    // --- 正式题数据  ---
     const formalTasks = [
         { id: "bell_Forward", options: ["闹铃声", "发条声", "敲击铁盆声", "玩具声", "鸡叫声"], answer: "闹铃声" },
         { id: "bell_Reversed", options: ["发条声", "鸡叫声", "闹铃声", "收银机声", "钱币碰撞声"], answer: "闹铃声" },
@@ -107,15 +106,19 @@
         { id: "wave_Reversed", options: ["车行驶声", "强风声", "风吹树叶声", "海浪声", "流沙声"], answer: "海浪声" }
     ];
 
+    // --- 逻辑控制 ---
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
 
     function showStep(s) {
         document.querySelectorAll('#app > div').forEach(d => d.classList.add('hidden'));
-        document.getElementById(s === 'test' ? 'step-test' : `step-${s}`).classList.remove('hidden');
+        const el = document.getElementById(s === 'test' ? 'step-test' : 'step-' + s);
+        if (el) el.classList.remove('hidden');
     }
 
     function checkInfo() {
-        if(!document.getElementById('age').value || !document.getElementById('ability').value) return alert("请先填写个人自评信息");
+        if(!document.getElementById('age').value || !document.getElementById('ability').value) {
+            return alert("请填写年龄和能力自评");
+        }
         state.tasks = practiceTasks;
         showStep('test');
         loadTask();
@@ -123,18 +126,18 @@
 
     function loadTask() {
         const t = state.tasks[state.index];
-        document.getElementById('progress-text').innerText = `${state.isPractice ? '热身题' : '正式题'} ${state.index + 1}/${state.tasks.length}`;
+        document.getElementById('progress-text').innerText = (state.isPractice ? '热身题' : '正式题') + ' ' + (state.index + 1) + '/' + state.tasks.length;
         document.getElementById('options-container').classList.add('hidden');
         document.getElementById('test-feedback').innerText = "";
         state.plays = 0;
         updateUI();
-        state.audio.src = `${audioPath}${t.id}.wav`;
+        state.audio.src = audioPath + t.id + ".wav";
         state.audio.load();
     }
 
     function updateUI() {
-        document.getElementById('play-count-text').innerText = `剩余播放次数：${2 - state.plays}`;
-        document.getElementById('play-btn').disabled = state.plays >= 2;
+        document.getElementById('play-count-text').innerText = "剩余播放次数：" + (2 - state.plays);
+        document.getElementById('play-btn').disabled = (state.plays >= 2);
     }
 
     function handlePlay() {
@@ -142,7 +145,7 @@
             state.audio.play();
             state.plays++;
             updateUI();
-            state.audio.onended = () => {
+            state.audio.onended = function() {
                 document.getElementById('options-container').classList.remove('hidden');
                 renderOptions();
             };
@@ -152,26 +155,26 @@
     function renderOptions() {
         const list = document.getElementById('options-list');
         list.innerHTML = "";
-        state.tasks[state.index].options.forEach(opt => {
+        state.tasks[state.index].options.forEach(function(opt) {
             const b = document.createElement('button');
             b.className = "option-btn";
             b.innerText = opt;
-            b.onclick = () => selectOption(opt);
+            b.onclick = function() { selectOption(opt); };
             list.appendChild(b);
         });
     }
 
     function selectOption(opt) {
         const t = state.tasks[state.index];
-        const ok = opt === t.answer;
-        
+        const ok = (opt === t.answer);
         if(state.isPractice) {
-            document.getElementById('test-feedback').innerText = ok ? "✅ 回答正确！请继续。" : `❌ 错误。那是${t.answer}。`; [cite: 14]
-            document.getElementById('test-feedback').style.color = ok ? "#34c759" : "#ff3b30";
-            setTimeout(() => {
+            const fb = document.getElementById('test-feedback');
+            fb.innerText = ok ? "✅ 正确！" : "❌ 错误，那是" + t.answer;
+            fb.style.color = ok ? "#34c759" : "#ff3b30";
+            setTimeout(function() {
                 if(++state.index < state.tasks.length) loadTask();
                 else startFormal();
-            }, 1800);
+            }, 1500);
         } else {
             state.results.push({ id: t.id, choice: opt, correct: ok });
             if(++state.index < state.tasks.length) loadTask();
@@ -180,23 +183,23 @@
     }
 
     function startFormal() {
-        alert("热身结束。现在进入 20 题正式测试，将不再提供反馈提示。"); [cite: 16]
+        alert("热身结束。开始 20 题正式测试 [cite: 16]。");
         state.isPractice = false;
         state.index = 0;
-        state.tasks = formalTasks.sort(() => Math.random() - 0.5); // 随机打乱 [cite: 16]
+        state.tasks = formalTasks.sort(function() { return 0.5 - Math.random(); });
         loadTask();
     }
 
     async function submitAll() {
-        document.getElementById('step-test').innerHTML = "<h3>正在上传数据，请稍候...</h3>";
+        document.getElementById('step-test').innerHTML = "<h3>正在提交...</h3>";
         try {
-            const authRes = await fetch(`${BASE_URL}/api/v2/dt-api/tasks/get-dtable-access-token/`, {
-                headers: { 'Authorization': `Token ${API_TOKEN}` }
+            const authRes = await fetch(BASE_URL + '/api/v2/dt-api/tasks/get-dtable-access-token/', {
+                headers: { 'Authorization': 'Token ' + API_TOKEN }
             });
-            const { access_token, dtable_uuid } = await authRes.json();
-            await fetch(`${BASE_URL}/dtable-server/api/v1/dtables/${dtable_uuid}/rows/`, {
+            const data = await authRes.json();
+            await fetch(BASE_URL + '/dtable-server/api/v1/dtables/' + data.dtable_uuid + '/rows/', {
                 method: 'POST',
-                headers: { 'Authorization': `Token ${access_token}`, 'Content-Type': 'application/json' },
+                headers: { 'Authorization': 'Token ' + data.access_token, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     table_name: 'Table1',
                     row: {
@@ -209,7 +212,7 @@
                 })
             });
             showStep('end');
-        } catch (e) { alert("上传失败，请截图结果并联系馆长。"); }
+        } catch (e) { alert("上传失败，请手动记录结果。"); }
     }
 </script>
 </body>
