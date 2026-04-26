@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频时间包络辨识实验</title>
+    <title>音频辨识实验 - 馆长版</title>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -26,8 +26,8 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p>欢迎。您将听取声音并选择最符合的描述。</p>
-        <button onclick="showStep(2)">开始</button>
+        <p>音频已打乱，顺序对所有人一致。请戴上耳机开始测试。</p>
+        <button onclick="showStep(2)">开始实验</button>
     </div>
 
     <div id="step-2" class="hidden">
@@ -36,14 +36,13 @@
         <input type="number" id="age" placeholder="您的年龄（必填）">
         <select id="gender"><option value="">选择性别</option><option value="男">男</option><option value="女">女</option></select>
         <select id="ability"><option value="">自评识别能力</option><option value="非常强">非常强</option><option value="较强">较强</option><option value="一般">一般</option><option value="较弱">较弱</option><option value="非常弱">非常弱</option></select>
-        <button onclick="checkInfo()">进入热身题</button>
+        <button onclick="checkInfo()">进入热身阶段</button>
     </div>
 
     <div id="step-test" class="hidden">
         <div id="progress-text" class="progress"></div>
-        <div style="font-size: 40px; margin-bottom: 20px;">🔊</div>
         <p id="play-count-text">剩余播放次数：2</p>
-        <button id="play-btn" onclick="handlePlay()">点击播放声音</button>
+        <button id="play-btn" onclick="handlePlay()">播放声音</button>
         <div id="options-container" class="hidden">
             <div id="options-list"></div>
         </div>
@@ -53,24 +52,23 @@
     <div id="step-end" class="hidden">
         <div style="font-size: 50px; margin-bottom: 20px;">✨</div>
         <h2>实验完成</h2>
-        <p>感谢您的参与，数据已妥善记录。</p>
+        <p>数据已成功同步，感谢参与！</p>
     </div>
 </div>
 
 <script>
+    // --- 核心配置（已更新真实 TOKEN） ---
     const API_TOKEN = 'd1715546b4b2a74c327d406cf8b8ae1e6d61652e'; 
     const PROXY = "https://corsproxy.io/?"; 
     const BASE_URL = "https://cloud.seatable.cn";
     const audioPath = "audio/"; 
 
-    // --- 热身题（顺序固定） ---
     const practiceTasks = [
         { id: "piano_Forward", options: ["钢琴声", "管风琴声", "鼓声", "电击声", "敲门声"], answer: "钢琴声" },
         { id: "testring_Forward", options: ["玻璃破碎声", "电话声", "直升机声", "发条声", "引擎声"], answer: "电话声" },
         { id: "testtrain_Reversed", options: ["象鸣声", "闹铃声", "火车声", "警报声", "拖椅子声"], answer: "火车声" }
     ];
 
-    // --- 正式题（原始列表） ---
     const formalTasks = [
         { id: "bell_Forward", options: ["闹铃声", "发条声", "敲击铁盆声", "玩具声", "鸡叫声"], answer: "闹铃声" },
         { id: "bell_Reversed", options: ["发条声", "鸡叫声", "闹铃声", "收银机声", "钱币碰撞声"], answer: "闹铃声" },
@@ -96,23 +94,15 @@
 
     let state = { tasks: [], index: 0, isPractice: true, plays: 0, results: [], audio: new Audio() };
 
-    // --- 固定种子随机打乱函数 ---
+    // --- 固定乱序逻辑（种子 2026） ---
     function seededShuffle(array, seed) {
         let m = array.length, t, i;
         while (m) {
-            i = Math.floor(seededRandom(seed) * m--);
-            t = array[m];
-            array[m] = array[i];
-            array[i] = t;
-            seed++; // 递增种子以确保每个位置的随机性不同
+            let x = Math.sin(seed++) * 10000;
+            i = Math.floor((x - Math.floor(x)) * m--);
+            t = array[m]; array[m] = array[i]; array[i] = t;
         }
         return array;
-    }
-
-    // 简单的伪随机数生成器
-    function seededRandom(seed) {
-        let x = Math.sin(seed++) * 10000;
-        return x - Math.floor(x);
     }
 
     function showStep(s) {
@@ -129,7 +119,7 @@
 
     function loadTask() {
         const t = state.tasks[state.index];
-        document.getElementById('progress-text').innerText = (state.isPractice ? '热身阶段 ' : '正式测试 ') + (state.index + 1) + ' / ' + state.tasks.length;
+        document.getElementById('progress-text').innerText = (state.isPractice ? '热身题 ' : '正式题 ') + (state.index + 1) + ' / ' + state.tasks.length;
         document.getElementById('options-container').classList.add('hidden');
         document.getElementById('test-feedback').innerText = "";
         state.plays = 0;
@@ -145,7 +135,7 @@
 
     function handlePlay() {
         if(state.plays < 2) {
-            state.audio.play().catch(e => console.log("播放被拦截"));
+            state.audio.play();
             state.plays++;
             updateUI();
             state.audio.onended = () => {
@@ -187,7 +177,7 @@
     function startFormal() {
         state.isPractice = false;
         state.index = 0;
-        // --- 使用固定种子 2026 打乱题目 ---
+        // 所有人看到的乱序都是一样的
         state.tasks = seededShuffle([...formalTasks], 2026); 
         loadTask();
     }
@@ -195,41 +185,51 @@
     async function submitAll() {
         const loadingDiv = document.getElementById('step-test');
         loadingDiv.innerHTML = "<h3>正在提交结果...</h3>";
+        
         const uName = document.getElementById('username').value || "匿名";
         const uAge = document.getElementById('age').value;
         const backupData = `姓名:${uName} | 年龄:${uAge} | 结果:${JSON.stringify(state.results)}`;
 
-        try {
-            const authUrl = `${BASE_URL}/api/v2/dtables/access-token/`;
-            const authRes = await fetch(PROXY + encodeURIComponent(authUrl), {
-                method: 'GET',
-                headers: { 'Authorization': 'Token ' + API_TOKEN, 'Accept': 'application/json' }
-            });
-            const authData = await authRes.json();
+        // 纠错逻辑：依次尝试单数和复数路径
+        const endpoints = [
+            `${BASE_URL}/api/v2/dtable/access-token/`, // 单数 (最常用)
+            `${BASE_URL}/api/v2/dtables/access-token/` // 复数
+        ];
 
-            await fetch(PROXY + encodeURIComponent(`${BASE_URL}/dtable-server/api/v1/dtables/${authData.dtable_uuid}/rows/`), {
-                method: 'POST',
-                headers: { 'Authorization': 'Token ' + authData.access_token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    table_name: 'Table1',
-                    row: {
-                        "名称": uName, "username": uName, "age": parseInt(uAge),
-                        "gender": document.getElementById('gender').value,
-                        "ability": document.getElementById('ability').value,
-                        "full_results": JSON.stringify(state.results)
-                    }
-                })
-            });
-            showStep('end');
-        } catch (e) {
-            loadingDiv.innerHTML = `
-                <div class="backup-area">
-                    <p style="color:#ff3b30;">⚠️ 自动上传失败，请手动复制结果发给馆长：</p>
-                    <textarea readonly onclick="this.select()">${backupData}</textarea>
-                    <button onclick="showStep('end')">已复制，结束</button>
-                </div>
-            `;
+        for (let url of endpoints) {
+            try {
+                const res = await fetch(PROXY + encodeURIComponent(url), {
+                    headers: { 'Authorization': 'Token ' + API_TOKEN }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    await fetch(PROXY + encodeURIComponent(`${BASE_URL}/dtable-server/api/v1/dtables/${data.dtable_uuid}/rows/`), {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Token ' + data.access_token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            table_name: 'Table1',
+                            row: {
+                                "名称": uName, "username": uName, "age": parseInt(uAge),
+                                "gender": document.getElementById('gender').value,
+                                "ability": document.getElementById('ability').value,
+                                "full_results": JSON.stringify(state.results)
+                            }
+                        })
+                    });
+                    showStep('end');
+                    return; // 成功后退出循环
+                }
+            } catch (e) { console.error("路径尝试失败:", url); }
         }
+
+        // 最终失败展示备份
+        loadingDiv.innerHTML = `
+            <div class="backup-area">
+                <p style="color:#ff3b30;">自动提交失败，请复制下方内容发给馆长：</p>
+                <textarea readonly onclick="this.select()">${backupData}</textarea>
+                <button onclick="showStep('end')">已复制，结束</button>
+            </div>
+        `;
     }
 </script>
 </body>
