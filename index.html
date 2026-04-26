@@ -148,42 +148,31 @@
         loadTask();
     }
 
- async function submitAll() {
+async function submitAll() {
         const loadingDiv = document.getElementById('step-test');
-        loadingDiv.innerHTML = "<h3>正在上传实验数据，请稍候...</h3>";
+        loadingDiv.innerHTML = "<h3>正在提交实验数据...</h3>";
+        
+        // 整理当前用户的数据字符串，用于备份 
+        const uName = document.getElementById('username').value || "匿名";
+        const uAge = document.getElementById('age').value || "0";
+        const backupData = `受试者：${uName}\n年龄：${uAge}\n数据：${JSON.stringify(state.results)}`;
 
-        // 使用公共 CORS 代理来解决 GitHub Pages 的跨域封锁
-        const PROXY = "https://cors-anywhere.azm.workers.dev/"; 
+        // 换用更稳定的代理
+        const PROXY = "https://corsproxy.io/?"; 
         const API_URL = "https://cloud.seatable.cn/api/v2/dtables/access-token/";
 
         try {
-            // 1. 通过代理获取 Access Token
-            const authRes = await fetch(PROXY + API_URL, {
+            // 1. 获取令牌
+            const authRes = await fetch(PROXY + encodeURIComponent(API_URL), {
                 method: 'GET',
-                headers: { 
-                    'Authorization': 'Token ' + API_TOKEN,
-                    'Accept': 'application/json'
-                }
+                headers: { 'Authorization': 'Token ' + API_TOKEN }
             });
-
-            if (!authRes.ok) throw new Error("获取令牌失败，请检查 API Token 是否有误或代理是否可用");
+            if (!authRes.ok) throw new Error("代理连接失败");
             const authData = await authRes.json();
 
-            // 2. 准备要存入 SeaTable 的数据 [cite: 1-7, 15-36]
-            const uName = document.getElementById('username').value || "匿名受试者";
-            const uAge = parseInt(document.getElementById('age').value) || 0;
-            const rowData = {
-                "名称": uName,
-                "username": uName,
-                "age": uAge,
-                "gender": document.getElementById('gender').value,
-                "ability": document.getElementById('ability').value,
-                "full_results": JSON.stringify(state.results)
-            };
-
-            // 3. 通过代理将数据写入行 [cite: 1-7]
-            const rowsUrl = "https://cloud.seatable.cn/dtable-server/api/v1/dtables/" + authData.dtable_uuid + "/rows/";
-            const postRes = await fetch(PROXY + rowsUrl, {
+            // 2. 写入数据 
+            const rowsUrl = `https://cloud.seatable.cn/dtable-server/api/v1/dtables/${authData.dtable_uuid}/rows/`;
+            const postRes = await fetch(PROXY + encodeURIComponent(rowsUrl), {
                 method: 'POST',
                 headers: { 
                     'Authorization': 'Token ' + authData.access_token,
@@ -191,18 +180,41 @@
                 },
                 body: JSON.stringify({
                     table_name: 'Table1',
-                    row: rowData
+                    row: {
+                        "名称": uName,
+                        "username": uName,
+                        "age": parseInt(uAge),
+                        "gender": document.getElementById('gender').value,
+                        "ability": document.getElementById('ability').value,
+                        "full_results": JSON.stringify(state.results)
+                    }
                 })
             });
 
-            if (!postRes.ok) throw new Error("写入数据失败，请检查表名或列名");
-
+            if (!postRes.ok) throw new Error("数据写入失败");
             showStep('end');
+
         } catch (e) {
             console.error("提交失败详情:", e);
-            alert("上传失败！原因：" + e.message + "\n\n建议截图保留结果并联系馆长。");
-            loadingDiv.innerHTML = `<h3>上传失败</h3><p>${e.message}</p><button onclick="submitAll()">重试提交</button>`;
+            // --- 触发“第二保险”：手动备份逻辑 --- [cite: 1-16]
+            loadingDiv.innerHTML = `
+                <div style="background: #fff2f2; border: 1px solid #ff3b30; padding: 20px; border-radius: 12px;">
+                    <h3 style="color: #ff3b30;">⚠️ 自动上传因网络限制失败</h3>
+                    <p style="font-size: 14px; text-align: left;">由于浏览器安全策略限制，数据无法自动同步到后台。<b>请务必复制下方文本发送给馆长：</b></p>
+                    <textarea id="copy-area" style="width: 100%; height: 120px; margin: 10px 0; padding: 10px; font-size: 12px; border-radius: 8px;">${backupData}</textarea>
+                    <button onclick="copyAndFinish()" style="background: #34c759;">点击复制并结束测试</button>
+                </div>
+            `;
         }
+    }
+
+    // 点击辅助功能
+    function copyAndFinish() {
+        const copyText = document.getElementById("copy-area");
+        copyText.select();
+        document.execCommand("copy");
+        alert("已复制到剪贴板！请通过微信/邮件发送给馆长。");
+        showStep('end');
     }
 </script>
 </body>
