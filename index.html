@@ -148,33 +148,63 @@
         loadTask();
     }
 
-    async function submitAll() {
-        document.getElementById('step-test').innerHTML = "<h3>正在上传数据...</h3>";
+   async function submitAll() {
+        const loadingDiv = document.getElementById('step-test');
+        loadingDiv.innerHTML = "<h3>正在上传实验数据，请稍候...</h3>";
+
+        // 使用公用 CORS 代理中转，解决 GitHub Pages 的跨域封锁
+        const PROXY = "https://cors-anywhere.azm.workers.dev/"; 
+        const API_URL = "https://cloud.seatable.cn/api/v2/dtables/access-token/";
+
         try {
-            // 注意这里的 URL 是针对 Base API Token 的正确路径
-            const authRes = await fetch(`${BASE_URL}/api/v2/dtables/access-token/`, {
+            // 1. 获取令牌（通过代理中转）
+            const authRes = await fetch(PROXY + API_URL, {
                 method: 'GET',
-                headers: { 'Authorization': `Token ${API_TOKEN}`, 'Accept': 'application/json' }
+                headers: { 
+                    'Authorization': `Token ${API_TOKEN}`,
+                    'Accept': 'application/json'
+                }
             });
+
+            if (!authRes.ok) throw new Error("代理转发失败或令牌无效");
             const authData = await authRes.json();
 
-            await fetch(`${BASE_URL}/dtable-server/api/v1/dtables/${authData.dtable_uuid}/rows/`, {
+            // 2. 准备数据
+            const uName = document.getElementById('username').value || "匿名受试者";
+            const uAge = parseInt(document.getElementById('age').value) || 0;
+
+            const rowData = {
+                "名称": uName,
+                "username": uName,
+                "age": uAge,
+                "gender": document.getElementById('gender').value,
+                "ability": document.getElementById('ability').value,
+                "full_results": JSON.stringify(state.results)
+            };
+
+            // 3. 写入数据（同样通过代理中转） [cite: 1-7, 15-36]
+            const rowsUrl = `https://cloud.seatable.cn/dtable-server/api/v1/dtables/${authData.dtable_uuid}/rows/`;
+            const postRes = await fetch(PROXY + rowsUrl, {
                 method: 'POST',
-                headers: { 'Authorization': `Token ${authData.access_token}`, 'Content-Type': 'application/json' },
+                headers: { 
+                    'Authorization': `Token ${authData.access_token}`,
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({
                     table_name: 'Table1',
-                    row: {
-                        "名称": document.getElementById('username').value || "匿名",
-                        "username": document.getElementById('username').value || "匿名",
-                        "age": parseInt(document.getElementById('age').value),
-                        "gender": document.getElementById('gender').value,
-                        "ability": document.getElementById('ability').value,
-                        "full_results": JSON.stringify(state.results)
-                    }
+                    row: rowData
                 })
             });
+
+            if (!postRes.ok) throw new Error("数据写入失败");
+
             showStep('end');
-        } catch (e) { alert("失败：" + e.message); }
+        } catch (e) {
+            console.error("提交出错:", e);
+            // 备选方案：如果自动上传实在被封锁，弹窗让用户手动复制结果 
+            alert("由于网络安全限制（CORS），自动上传失败。\n\n请截图保留您的结果，或联系馆长。");
+            loadingDiv.innerHTML = `<h3>上传失败</h3><p>原因：${e.message}</p><button onclick="submitAll()">重试提交</button>`;
+        }
     }
 </script>
 </body>
