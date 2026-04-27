@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频时间包络辨识实验</title>
+    <title>音频辨识实验</title>
     <style>
         :root { --primary: #007AFF; --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -26,7 +26,7 @@
     <div id="step-1">
         <div style="font-size: 50px; margin-bottom: 20px;">🎧</div>
         <h2>音频辨识实验</h2>
-        <p>数据系统已切换至 Formspree。请戴上耳机，点击下方按钮开始。</p>
+        <p>本实验大概3-5分钟即可完成。不会搜集任何个人信息。建议配戴上耳机，点击下方按钮开始。</p>
         <button onclick="showStep(2)">开始实验</button>
     </div>
 
@@ -96,7 +96,7 @@
         { id: "rain_Forward", options: ["暴雨声", "流沙声", "淋浴声", "挤压塑料声", "拖拽纸箱声"], answer: "暴雨声" },
         { id: "rain_Reversed", options: ["抽水声", "淋雨声", "挤压塑料声", "暴雨声", "拖拽纸箱声"], answer: "暴雨声" },
         { id: "testcrushedbottle_Forward", options: ["油沸腾声", "挤压塑料声", "木板嘎吱声", "放屁声", "弹珠声"], answer: "挤压塑料声" },
-        { id: "testcrushedbottle_Reversed", options: ["拉链声", "木板嘎吱声", "放屁声", "油沸腾声", "抽水声"], answer: "抽水声" },
+        { id: "testcrushedbottle_Reversed", options: ["拉链声", "木板嘎吱声", "放屁声", "油沸腾声", "挤压塑料声"], answer: "挤压塑料声" },
         { id: "walk_Forward", options: ["走楼梯声", "射击声", "钻地声", "鞭炮声", "弹珠声"], answer: "走楼梯声" },
         { id: "walk_Reversed", options: ["史莱姆声", "吮吸声", "钻地声", "走楼梯声", "射击声"], answer: "走楼梯声" },
         { id: "wave_Forward", options: ["强风声", "海浪声", "流沙声", "风吹树叶声", "雷声"], answer: "海浪声" },
@@ -172,7 +172,7 @@
         const ok = (opt === t.answer);
         if(state.isPractice) {
             const fb = document.getElementById('test-feedback');
-            fb.innerText = ok ? "✅ 正确" : "❌ 错误";
+            fb.innerText = ok ? "✅ 正确！" : "❌ 并不是哦，请认真听";
             setTimeout(() => {
                 if(++state.index < state.tasks.length) loadTask();
                 else {
